@@ -147,12 +147,8 @@ class PlaceViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             tip = serializer.save(place=place, user=user)
 
-            # Cập nhật metrics place nếu user là local verified và cùng quận
-            profile = getattr(user, 'profile', None)
-            if profile and profile.is_local_verified and (profile.residing_district.strip().lower() == place.district.strip().lower()):
-                PlaceVerification.objects.get_or_create(place=place, user=user)
-                place.recalculate_trust_metrics()
-                place.save(update_fields=['verified_count', 'trust_tier', 'last_verified_at', 'updated_at'])
+            # Cập nhật thời gian thay đổi của place
+            place.save(update_fields=['updated_at'])
 
             return Response(
                 TipSerializer(tip, context={'request': request}).data,

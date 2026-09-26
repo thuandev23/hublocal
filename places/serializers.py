@@ -79,7 +79,12 @@ class PlaceListSerializer(serializers.ModelSerializer):
             'category_display',
             'district',
             'address',
+            'latitude',
+            'longitude',
             'cover_image',
+            'google_maps_url',
+            'google_rating',
+            'google_review_count',
             'trust_tier',
             'trust_tier_display',
             'verified_count',
@@ -99,7 +104,7 @@ class PlaceListSerializer(serializers.ModelSerializer):
 class PlaceDetailSerializer(serializers.ModelSerializer):
     """
     Serializer chi tiết cho Màn hình 2 (Chi tiết địa điểm).
-    Bao gồm danh sách mẹo từ cư dân, tọa độ bản đồ, trạng thái xác thực của user hiện tại.
+    Bao gồm danh sách mẹo từ cư dân, tọa độ bản đồ, thông tin và review từ Google Maps, trạng thái xác thực.
     """
     category_display = serializers.CharField(source='get_category_display', read_only=True)
     trust_tier_display = serializers.CharField(source='get_trust_tier_display', read_only=True)
@@ -119,6 +124,12 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
             'latitude',
             'longitude',
             'cover_image',
+            'google_maps_url',
+            'google_rating',
+            'google_review_count',
+            'google_reviews',
+            'google_scraped_at',
+            'imported_at',
             'trust_tier',
             'trust_tier_display',
             'verified_count',

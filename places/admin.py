@@ -24,14 +24,14 @@ class PlaceAdmin(admin.ModelAdmin):
         'name',
         'category',
         'district',
+        'get_gps',
         'get_trust_badge',
         'verified_count',
-        'last_verified_at',
         'updated_at'
     )
     list_filter = ('category', 'trust_tier', 'district')
     search_fields = ('name', 'address')
-    readonly_fields = ('verified_count', 'trust_tier', 'last_verified_at', 'created_at', 'updated_at')
+    readonly_fields = ('verified_count', 'trust_tier', 'last_verified_at', 'google_scraped_at', 'imported_at', 'created_at', 'updated_at')
     inlines = [TipInline, PlaceVerificationInline]
     actions = ['recalculate_metrics_action']
 
@@ -41,12 +41,21 @@ class PlaceAdmin(admin.ModelAdmin):
         }),
         ('Tọa độ địa lý (GPS)', {
             'fields': ('latitude', 'longitude'),
+        }),
+        ('Dữ liệu nguồn Google Maps (Tham khảo)', {
+            'fields': ('google_maps_url', 'google_rating', 'google_review_count', 'google_scraped_at', 'imported_at'),
             'classes': ('collapse',)
         }),
         ('Chỉ số tín nhiệm (Auto)', {
             'fields': ('trust_tier', 'verified_count', 'last_verified_at', 'created_at', 'updated_at')
         }),
     )
+
+    def get_gps(self, obj):
+        if obj.latitude and obj.longitude:
+            return f"{obj.latitude:.4f}, {obj.longitude:.4f}"
+        return "-"
+    get_gps.short_description = "Tọa độ GPS"
 
     def get_trust_badge(self, obj):
         if obj.trust_tier == TrustTier.TIER_2_HIGH_TRUST:

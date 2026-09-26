@@ -55,6 +55,49 @@ class Place(models.Model):
         verbose_name="Link ảnh bìa"
     )
 
+    # Thông tin nguồn Google Maps (Dữ liệu tham khảo - tách biệt với HubLocal Trust)
+    google_place_id = models.CharField(
+        max_length=255,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="Google Place ID"
+    )
+    google_maps_url = models.URLField(
+        max_length=1000,
+        blank=True,
+        default='',
+        verbose_name="Link Google Maps gốc"
+    )
+    google_rating = models.DecimalField(
+        max_digits=3,
+        decimal_places=1,
+        null=True,
+        blank=True,
+        verbose_name="Điểm Google Maps"
+    )
+    google_review_count = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Số lượng review trên Google"
+    )
+    google_reviews = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Review từ Google (Dữ liệu thô tham khảo)"
+    )
+    google_scraped_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Thời điểm thu thập từ Google"
+    )
+    imported_at = models.DateTimeField(
+        auto_now=True,
+        null=True,
+        blank=True,
+        verbose_name="Thời điểm nhập vào HubLocal"
+    )
+
     # Denormalized fields để tăng tốc độ truy vấn đọc lớn
     verified_count = models.PositiveIntegerField(
         default=0,
