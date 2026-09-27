@@ -9,6 +9,7 @@ from .views import (
     LogoutView,
     UserProfileView,
     SubmitLocalVerificationView,
+    AcknowledgeCelebrationView,
 )
 
 app_name = 'users'
@@ -19,6 +20,7 @@ urlpatterns = [
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/me/', MeView.as_view(), name='me'),
     path('auth/logout/', LogoutView.as_view(), name='logout'),
+    path('auth/ack-celebration/', AcknowledgeCelebrationView.as_view(), name='ack_celebration'),
     path('profile/', UserProfileView.as_view(), name='profile'),
     path('profile/verify-local/', SubmitLocalVerificationView.as_view(), name='verify_local'),
 ]

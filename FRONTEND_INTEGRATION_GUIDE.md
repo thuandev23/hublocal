@@ -311,17 +311,42 @@ GET /auth/me/
     "is_local_verified": false,
     "verified_at": null,
     "verification_rejected_reason": "",
+    "has_seen_verification_modal": false,
     "created_at": "2026-09-27T01:06:35+07:00",
     "updated_at": "2026-09-27T01:06:35+07:00"
   },
   "permissions": {
-    "can_verify_places": false,
+    "can_verify_places": true,
     "can_add_tips": true
-  }
+  },
+  "impact_metrics": {
+    "verified_places_count": 5,
+    "tips_count": 3,
+    "saved_places_count": 12
+  },
+  "show_celebration_modal": true
 }
 ```
 
-##### 2. Gửi hồ sơ xác minh cư dân:
+> [!TIP]
+> **Hướng Dẫn Render Màn Hình Vinh Danh (Celebration Modal):**
+> * Khi gọi `GET /auth/me/`, nếu `show_celebration_modal == true`, Frontend lập tức kích hoạt Pop-up / Dialog vinh danh chúc mừng kèm pháo hoa (Confetti Animation).
+> * Khi người dùng bấm **[Đóng]** hoặc **[Khám phá & Xác nhận ngay]**, gọi `POST /auth/ack-celebration/` để máy chủ tắt cờ này vĩnh viễn, tránh gây phiền hà trong các lần mở app sau.
+
+##### 2. Xác nhận đã xem Pop-up vinh danh (Chống hiện lặp lại):
+```http
+POST /auth/ack-celebration/
+```
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "show_celebration_modal": false,
+  "message": "Đã ghi nhận đã xem màn hình vinh danh."
+}
+```
+
+##### 3. Gửi hồ sơ xác minh cư dân:
 ```http
 POST /profile/verify-local/
 ```
@@ -454,3 +479,71 @@ class PlaceModel {
   }
 }
 ```
+
+---
+
+## 🔔 6. Tích Hợp Thông Báo Đẩy Firebase (FCM Push & In-App Mailbox)
+
+Hệ thống Backend đã trang bị sẵn sàng hạ tầng **Firebase Cloud Messaging (FCM)** và Hộp thư thông báo in-app:
+
+### 1. Đăng ký Device Token khi mở App hoặc Đăng nhập thành công:
+Ngay khi lấy được token từ `FirebaseMessaging.instance.getToken()`, ứng dụng gửi lên Backend:
+```http
+POST /notifications/devices/
+```
+**Request Body:**
+```json
+{
+  "token": "c7x89qLm...chuỗi_fcm_token_từ_firebase",
+  "platform": "android" 
+}
+```
+*(Các platform hợp lệ: `"android"`, `"ios"`, `"web"`)*
+
+### 2. Hủy Token khi Đăng Xuất (Logout):
+Trước khi xóa session trên máy, gọi endpoint này để ngừng bắn push vào thiết bị cũ:
+```http
+DELETE /notifications/devices/
+```
+**Request Body:**
+```json
+{
+  "token": "c7x89qLm...chuỗi_fcm_token_cần_xóa"
+}
+```
+
+### 3. Hộp Thư Thông Báo In-App (Notification Center):
+Lấy danh sách các thông báo người dùng đã nhận:
+```http
+GET /notifications/?page=1
+```
+**Response (200 OK):**
+```json
+{
+  "count": 1,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 1,
+      "title": "🎉 Hồ sơ cư dân của bạn đã được duyệt!",
+      "body": "Chúc mừng bạn đã trở thành Cư dân chính thức tại Thủ Đức. Hãy bảo chứng cho những quán quen của bạn ngay hôm nay!",
+      "data": {
+        "type": "VERIFICATION_APPROVED",
+        "district": "Thủ Đức"
+      },
+      "is_read": false,
+      "created_at": "2026-09-27T17:57:10+07:00"
+    }
+  ]
+}
+```
+
+### 4. Đánh Dấu Đã Đọc:
+* **Từng thông báo:** `POST /notifications/{id}/read/`
+* **Đọc tất cả:** `POST /notifications/read-all/`
+
+### 5. Các Kịch Bản Bắn Thông Báo Tự Động Từ Server:
+1. **`VERIFICATION_APPROVED`:** Khi hồ sơ cư dân chuyển từ `pending` sang `verified`.
+2. **`PLACE_TIER_UPGRADED`:** Khi một quán mà người dùng từng xác nhận đạt mốc $\ge 3$ lượt và thăng hạng lên **Tier 2 (High Trust)**.
+

@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     # Domain Apps
     'users.apps.UsersConfig',
     'places.apps.PlacesConfig',
+    'notifications.apps.NotificationsConfig',
 ]
 
 MIDDLEWARE = [

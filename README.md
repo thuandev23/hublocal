@@ -237,6 +237,26 @@ Khi đưa hệ thống lên máy chủ thực tế (DigitalOcean, AWS EC2, VPS U
 
 ---
 
+## 🛠️ Cổng Quản Trị Cư Dân & Vận Hành (Admin Portal)
+
+Hệ thống quản trị Django Admin tại URL `/admin/` được nâng cấp toàn diện phục vụ đội ngũ vận hành HubLocal:
+
+### 1. Phê Duyệt Cư Dân 1-Click (`/admin/users/userprofile/`):
+* **Huy hiệu trực quan:** Phân biệt trạng thái `⏳ Chờ phê duyệt` (Vàng), `● Đã xác thực` (Xanh lá), `✕ Bị từ chối` (Đỏ).
+* **Nút bấm 1-click:** Nút `[Duyệt]` và `[Từ chối]` trực tiếp ngay trên danh sách.
+* **Bulk Actions:** Chọn nhiều cư dân để duyệt hoặc từ chối hàng loạt.
+* **Tự động kích hoạt Push Notification:** Ngay khi tài khoản được duyệt hoặc từ chối, hệ thống gửi thông báo Push FCM và thông báo in-app đến điện thoại của người dùng kèm lý do chi tiết.
+
+### 2. Quản Lý Báo Cáo Địa Điểm (`/admin/places/placereport/`):
+* Tiếp nhận và phân loại phản ánh từ người dùng: `Quán đóng cửa`, `Sai lệch thông tin`, `Spam`.
+* Actions 1-click: `Đánh dấu Đã xử lý (RESOLVED)` hoặc `Bác bỏ (DISMISSED)`.
+
+### 3. Giám Sát Thiết Bị & Push Notifications (`/admin/notifications/`):
+* **Device Tokens:** Quản lý FCM Registration Tokens của thiết bị di động (Android / iOS / Web).
+* **Hộp thư thông báo:** Lịch sử gửi, phân loại payload (`VERIFICATION_APPROVED`, `PLACE_TIER_UPGRADED`, `SYSTEM`), trạng thái đã đọc và action `Gửi lại Push`.
+
+---
+
 ## 👥 Đóng Góp & Quản Trị
 * **Tác giả:** Đội ngũ Kỹ thuật & Sản phẩm HubLocal.
 * **Liên hệ:** `contact@hublocal.vn`

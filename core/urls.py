@@ -30,4 +30,5 @@ urlpatterns = [
     # API v1 routes
     path('api/v1/', include('users.urls', namespace='users')),
     path('api/v1/', include('places.urls', namespace='places')),
+    path('api/v1/notifications/', include('notifications.urls', namespace='notifications')),
 ]

@@ -77,6 +77,10 @@ class UserProfile(models.Model):
         default='',
         verbose_name="Lý do từ chối xác thực"
     )
+    has_seen_verification_modal = models.BooleanField(
+        default=False,
+        verbose_name="Đã xem pop-up chúc mừng xác thực"
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Ngày tạo")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Cập nhật lần cuối")
 

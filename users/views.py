@@ -47,7 +47,10 @@ class MeView(generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
-        return self.request.user
+        user = self.request.user
+        if hasattr(user, 'profile'):
+            user.profile.refresh_from_db()
+        return user
 
 
 class LogoutView(generics.GenericAPIView):
@@ -107,4 +110,23 @@ class SubmitLocalVerificationView(generics.GenericAPIView):
             'residing_months': profile.residing_months,
             'message': 'Hồ sơ xác minh cư dân đã được tiếp nhận và chuyển sang trạng thái chờ duyệt. HubLocal tuyệt đối không cấp huy hiệu tự động để bảo đảm uy tín của cộng đồng.'
         }, status=status.HTTP_200_OK)
+
+
+class AcknowledgeCelebrationView(generics.GenericAPIView):
+    """
+    API Đánh dấu người dùng đã xem Pop-up vinh danh xác thực cư dân thành công (tránh hiện lặp lại).
+    Endpoint: POST /api/v1/auth/ack-celebration/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        profile.has_seen_verification_modal = True
+        profile.save(update_fields=['has_seen_verification_modal', 'updated_at'])
+        return Response({
+            'success': True,
+            'show_celebration_modal': False,
+            'message': 'Đã ghi nhận đã xem màn hình vinh danh.'
+        }, status=status.HTTP_200_OK)
+
 

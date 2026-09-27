@@ -15,6 +15,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'is_local_verified',
             'verified_at',
             'verification_rejected_reason',
+            'has_seen_verification_modal',
             'created_at',
             'updated_at'
         ]
@@ -24,6 +25,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'is_local_verified',
             'verified_at',
             'verification_rejected_reason',
+            'has_seen_verification_modal',
             'created_at',
             'updated_at'
         ]
@@ -32,11 +34,23 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class UserDetailSerializer(serializers.ModelSerializer):
     profile = UserProfileSerializer(read_only=True)
     permissions = serializers.SerializerMethodField()
+    impact_metrics = serializers.SerializerMethodField()
+    show_celebration_modal = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'phone_number', 'first_name', 'last_name', 'profile', 'permissions']
-        read_only_fields = ['id', 'permissions']
+        fields = [
+            'id',
+            'username',
+            'phone_number',
+            'first_name',
+            'last_name',
+            'profile',
+            'permissions',
+            'impact_metrics',
+            'show_celebration_modal',
+        ]
+        read_only_fields = ['id', 'permissions', 'impact_metrics', 'show_celebration_modal']
 
     def get_permissions(self, obj):
         profile = getattr(obj, 'profile', None)
@@ -45,6 +59,19 @@ class UserDetailSerializer(serializers.ModelSerializer):
             'can_verify_places': is_verified,
             'can_add_tips': True,  # Mọi user đã xác thực tài khoản đều được đóng góp tip
         }
+
+    def get_impact_metrics(self, obj):
+        return {
+            'verified_places_count': obj.place_verifications.count(),
+            'tips_count': obj.tips.count(),
+            'saved_places_count': obj.saved_places.count(),
+        }
+
+    def get_show_celebration_modal(self, obj):
+        profile = getattr(obj, 'profile', None)
+        if profile and profile.is_local_verified and not profile.has_seen_verification_modal:
+            return True
+        return False
 
 
 class RegisterSerializer(serializers.ModelSerializer):
