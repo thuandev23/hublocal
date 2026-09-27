@@ -17,6 +17,28 @@ DEBUG = os.environ.get('DEBUG', '1') in ['1', 'true', 'True', 'yes', 'Yes']
 allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '*')
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.strip()] or ['*']
 
+# Khi chạy chế độ DEV, tự động hỗ trợ các tunnel phổ biến (ngrok, localtunnel)
+if DEBUG:
+    dev_wildcards = ['.ngrok-free.dev', '.ngrok-free.app', '.ngrok.app', '.ngrok.io', 'localhost', '127.0.0.1', '*']
+    for host in dev_wildcards:
+        if host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(host)
+
+csrf_origins_env = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_origins_env.split(',') if origin.strip()]
+if DEBUG:
+    default_dev_origins = [
+        'https://*.ngrok-free.dev',
+        'https://*.ngrok-free.app',
+        'https://*.ngrok.app',
+        'https://*.ngrok.io',
+        'http://localhost:8123',
+        'http://127.0.0.1:8123',
+    ]
+    for origin in default_dev_origins:
+        if origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(origin)
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
