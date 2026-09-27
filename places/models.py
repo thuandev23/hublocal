@@ -72,6 +72,11 @@ class Place(models.Model):
         default='',
         verbose_name="Link ảnh thu nhỏ"
     )
+    photos = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Danh sách link ảnh album (Google Maps)"
+    )
 
     # Trạng thái hoạt động thực tế
     status = models.CharField(

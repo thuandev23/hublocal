@@ -188,6 +188,7 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
             'longitude',
             'cover_image',
             'thumbnail_image',
+            'photos',
             'min_price',
             'max_price',
             'price_currency',

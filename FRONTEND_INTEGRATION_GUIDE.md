@@ -215,8 +215,12 @@ GET /places/{id}/
   "address": "419/2 Đ. Số 48, Hiệp Bình, Hồ Chí Minh",
   "latitude": "10.835047",
   "longitude": "106.728302",
-  "cover_image": "",
-  "thumbnail_image": "",
+  "cover_image": "https://lh3.googleusercontent.com/...",
+  "thumbnail_image": "https://lh3.googleusercontent.com/...",
+  "photos": [
+    "https://lh3.googleusercontent.com/...",
+    "https://lh3.googleusercontent.com/..."
+  ],
   "min_price": null,
   "max_price": null,
   "price_currency": "VND",
@@ -390,6 +394,8 @@ class PlaceModel {
   final double? latitude;
   final double? longitude;
   final String coverImage;
+  final String thumbnailImage;
+  final List<String> photos;
   final int? minPrice;
   final int? maxPrice;
   final String openingHoursText;
@@ -410,6 +416,8 @@ class PlaceModel {
     this.latitude,
     this.longitude,
     required this.coverImage,
+    required this.thumbnailImage,
+    required this.photos,
     this.minPrice,
     this.maxPrice,
     required this.openingHoursText,
@@ -432,6 +440,8 @@ class PlaceModel {
       latitude: json['latitude'] != null ? double.tryParse(json['latitude'].toString()) : null,
       longitude: json['longitude'] != null ? double.tryParse(json['longitude'].toString()) : null,
       coverImage: json['cover_image'] ?? '',
+      thumbnailImage: json['thumbnail_image'] ?? '',
+      photos: (json['photos'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
       minPrice: json['min_price'] != null ? int.tryParse(json['min_price'].toString()) : null,
       maxPrice: json['max_price'] != null ? int.tryParse(json['max_price'].toString()) : null,
       openingHoursText: json['opening_hours_text'] ?? '',

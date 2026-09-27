@@ -93,6 +93,26 @@ class Command(BaseCommand):
             place_id = item.get('place_id') or item.get('data_id') or item.get('cid')
             google_url = item.get('link') or item.get('url') or ''
             cover_image = item.get('main_photo') or item.get('photo') or item.get('featured_image') or ''
+            thumbnail_image = item.get('thumbnail') or ''
+            photos_list = []
+
+            # Trích xuất toàn bộ album ảnh từ kết quả cào Google Maps
+            raw_images = item.get('images') or item.get('photos') or []
+            if isinstance(raw_images, list):
+                for img_item in raw_images:
+                    img_url = ''
+                    if isinstance(img_item, dict):
+                        img_url = img_item.get('image') or img_item.get('url') or img_item.get('photo') or ''
+                    elif isinstance(img_item, str):
+                        img_url = img_item
+
+                    if img_url and img_url.startswith('http') and img_url not in photos_list:
+                        photos_list.append(img_url)
+
+            if not cover_image and photos_list:
+                cover_image = photos_list[0]
+            if not thumbnail_image and cover_image:
+                thumbnail_image = cover_image
 
             # Parse tọa độ
             lat = None
@@ -190,6 +210,10 @@ class Command(BaseCommand):
                     place.longitude = lng
                 if not place.cover_image and cover_image:
                     place.cover_image = cover_image
+                if thumbnail_image and not place.thumbnail_image:
+                    place.thumbnail_image = thumbnail_image
+                if photos_list:
+                    place.photos = photos_list
 
                 place.save()
                 updated_count += 1
@@ -203,6 +227,8 @@ class Command(BaseCommand):
                     latitude=lat,
                     longitude=lng,
                     cover_image=cover_image or '',
+                    thumbnail_image=thumbnail_image or '',
+                    photos=photos_list,
                     google_place_id=place_id,
                     google_maps_url=google_url,
                     google_rating=rating,
