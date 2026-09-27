@@ -72,13 +72,39 @@ def send_push_notification(user, title, body, data=None):
         try:
             from firebase_admin import messaging
 
+            # Cấu hình Android: High Priority + Heads-up Banner + Kênh thông báo chuẩn
+            android_config = messaging.AndroidConfig(
+                priority='high',
+                notification=messaging.AndroidNotification(
+                    channel_id='hublocal_alerts',
+                    sound='default',
+                    default_sound=True,
+                    priority='high',
+                    click_action='FLUTTER_NOTIFICATION_CLICK',
+                )
+            )
+
+            # Cấu hình iOS (APNs): Priority 10 + Âm thanh + Đánh dấu Badge
+            apns_config = messaging.APNSConfig(
+                headers={'apns-priority': '10'},
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(
+                        sound='default',
+                        badge=1,
+                        content_available=True,
+                    )
+                )
+            )
+
             message = messaging.MulticastMessage(
                 notification=messaging.Notification(
                     title=title,
                     body=body
                 ),
                 data=fcm_data,
-                tokens=active_tokens
+                tokens=active_tokens,
+                android=android_config,
+                apns=apns_config,
             )
 
             response = messaging.send_each_for_multicast(message)

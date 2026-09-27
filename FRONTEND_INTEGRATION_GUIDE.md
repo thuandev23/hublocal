@@ -545,5 +545,104 @@ GET /notifications/?page=1
 
 ### 5. Các Kịch Bản Bắn Thông Báo Tự Động Từ Server:
 1. **`VERIFICATION_APPROVED`:** Khi hồ sơ cư dân chuyển từ `pending` sang `verified`.
-2. **`PLACE_TIER_UPGRADED`:** Khi một quán mà người dùng từng xác nhận đạt mốc $\ge 3$ lượt và thăng hạng lên **Tier 2 (High Trust)**.
+2. **`VERIFICATION_REJECTED`:** Khi hồ sơ bị từ chối kèm lý do chi tiết từ Admin.
+3. **`PLACE_TIER_UPGRADED`:** Khi một quán mà người dùng từng xác nhận đạt mốc $\ge 3$ lượt và thăng hạng lên **Tier 2 (High Trust)**.
+
+---
+
+### 6. Xử Lý 4 Trạng Thái Vòng Đời Thông Báo Trên Flutter (Lifecycle Handlers)
+
+Để thông báo hoạt động hoàn hảo trên mọi trường hợp, ứng dụng Flutter cần cài đặt `firebase_messaging` và `flutter_local_notifications` theo mô hình chuẩn dưới đây:
+
+```dart
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+// 1. Trạng thái BACKGROUND & KILL-APP (Terminated): Handler ở cấp Top-Level
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  // Hệ điều hành Android/iOS tự động hiển thị thông báo lên System Tray do Backend đã gửi priority: 'high'
+}
+
+class PushNotificationService {
+  static Future<void> initialize() async {
+    // Đăng ký Background Handler
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    // Yêu cầu quyền thông báo trên iOS/Android 13+
+    NotificationSettings settings = await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    // Cấu hình Kênh thông báo Android (Heads-up Notification Channel)
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      'hublocal_alerts',
+      'Thông báo HubLocal',
+      description: 'Kênh nhận thông báo duyệt cư dân và thăng hạng địa điểm',
+      importance: Importance.max,
+      playSound: true,
+    );
+
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+
+    // 2. Trạng thái FOREGROUND (Khi App đang mở trên màn hình):
+    // Firebase không tự hiện banner khi đang mở app, cần dùng flutter_local_notifications để kích hoạt
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      RemoteNotification? notification = message.notification;
+      AndroidNotification? android = message.notification?.android;
+
+      if (notification != null) {
+        flutterLocalNotificationsPlugin.show(
+          notification.hashCode,
+          notification.title,
+          notification.body,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              channel.id,
+              channel.name,
+              channelDescription: channel.description,
+              icon: '@mipmap/ic_launcher',
+              importance: Importance.max,
+              priority: Priority.high,
+            ),
+            iOS: const DarwinNotificationDetails(
+              presentAlert: true,
+              presentBadge: true,
+              presentSound: true,
+            ),
+          ),
+        );
+      }
+    });
+
+    // 3. Trạng thái BACKGROUND: Người dùng bấm vào thông báo khi app đang ẩn
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      _handleNotificationNavigation(message.data);
+    });
+
+    // 4. Trạng thái KILL-APP (Terminated): App bị tắt hoàn toàn và người dùng bấm vào thông báo để mở app
+    RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      _handleNotificationNavigation(initialMessage.data);
+    }
+  }
+
+  static void _handleNotificationNavigation(Map<String, dynamic> data) {
+    final type = data['type'];
+    if (type == 'VERIFICATION_APPROVED') {
+      // Chuyển hướng tới Màn hình Hồ sơ hoặc kích hoạt Pop-up chúc mừng
+    } else if (type == 'PLACE_TIER_UPGRADED') {
+      // Chuyển hướng tới Màn hình Chi tiết quán: data['place_id']
+    }
+  }
+}
+```
 
