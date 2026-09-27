@@ -9,6 +9,12 @@ class CategoryChoices(models.TextChoices):
     SERVICES = 'SERVICES', 'Dịch vụ'
 
 
+class PlaceStatus(models.TextChoices):
+    OPEN = 'OPEN', 'Đang hoạt động'
+    TEMP_CLOSED = 'TEMP_CLOSED', 'Tạm thời đóng cửa'
+    PERM_CLOSED = 'PERM_CLOSED', 'Đã ngừng hoạt động'
+
+
 class TrustTier(models.IntegerChoices):
     TIER_0_UNVERIFIED = 0, 'Chưa có xác thực local'
     TIER_1_VERIFIED = 1, '1-2 local xác thực (icon check)'
@@ -33,6 +39,12 @@ class Place(models.Model):
         db_index=True,
         verbose_name="Quận/Khu vực"
     )
+    district_code = models.CharField(
+        max_length=50,
+        default='THU_DUC',
+        db_index=True,
+        verbose_name="Mã quận chuẩn hóa"
+    )
     address = models.CharField(max_length=500, verbose_name="Địa chỉ")
     latitude = models.DecimalField(
         max_digits=9,
@@ -53,6 +65,67 @@ class Place(models.Model):
         blank=True,
         default='',
         verbose_name="Link ảnh bìa"
+    )
+    thumbnail_image = models.URLField(
+        max_length=1000,
+        blank=True,
+        default='',
+        verbose_name="Link ảnh thu nhỏ"
+    )
+
+    # Trạng thái hoạt động thực tế
+    status = models.CharField(
+        max_length=20,
+        choices=PlaceStatus.choices,
+        default=PlaceStatus.OPEN,
+        db_index=True,
+        verbose_name="Trạng thái hoạt động"
+    )
+
+    # Thông tin khoảng giá (Không tạo giá mẫu; null nếu chưa rõ)
+    min_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=0,
+        null=True,
+        blank=True,
+        verbose_name="Giá tối thiểu (VNĐ)"
+    )
+    max_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=0,
+        null=True,
+        blank=True,
+        verbose_name="Giá tối đa (VNĐ)"
+    )
+    price_currency = models.CharField(
+        max_length=10,
+        default='VND',
+        verbose_name="Đơn vị tiền tệ"
+    )
+    price_updated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Thời điểm cập nhật giá"
+    )
+
+    # Giờ hoạt động
+    opening_hours_text = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name="Giờ mở cửa hiển thị"
+    )
+    opening_hours_structured = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Cấu trúc giờ mở cửa tuần"
+    )
+
+    # Nguồn dữ liệu
+    data_source = models.CharField(
+        max_length=50,
+        default='google_maps',
+        verbose_name="Nguồn dữ liệu gốc"
     )
 
     # Thông tin nguồn Google Maps (Dữ liệu tham khảo - tách biệt với HubLocal Trust)
@@ -224,3 +297,94 @@ class Tip(models.Model):
 
     def __str__(self):
         return f"Mẹo của {self.user} tại {self.place.name}"
+
+
+class SavedPlace(models.Model):
+    """
+    Bản ghi địa điểm được người dùng lưu lại (Bookmarks/Favorites).
+    Ràng buộc Unique ngăn chặn duplicate.
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='saved_places',
+        verbose_name="Người dùng"
+    )
+    place = models.ForeignKey(
+        Place,
+        on_delete=models.CASCADE,
+        related_name='saved_by',
+        verbose_name="Địa điểm"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Thời điểm lưu")
+
+    class Meta:
+        verbose_name = "Địa điểm đã lưu"
+        verbose_name_plural = "Danh sách địa điểm đã lưu"
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'place'],
+                name='unique_user_saved_place'
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user} đã lưu {self.place.name}"
+
+
+class ReportTypeChoices(models.TextChoices):
+    CLOSED = 'CLOSED', 'Quán đã đóng cửa / Ngừng hoạt động'
+    WRONG_INFO = 'WRONG_INFO', 'Sai lệch thông tin (Địa chỉ, số điện thoại, giá)'
+    SPAM = 'SPAM', 'Nội dung spam, quảng cáo rác hoặc trùng lặp'
+    OTHER = 'OTHER', 'Vấn đề khác'
+
+
+class PlaceReport(models.Model):
+    """
+    Phản ánh và báo cáo sai lệch thông tin từ người dùng cho địa điểm.
+    """
+    place = models.ForeignKey(
+        Place,
+        on_delete=models.CASCADE,
+        related_name='reports',
+        verbose_name="Địa điểm bị báo cáo"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='place_reports',
+        verbose_name="Người báo cáo"
+    )
+    report_type = models.CharField(
+        max_length=30,
+        choices=ReportTypeChoices.choices,
+        default=ReportTypeChoices.WRONG_INFO,
+        verbose_name="Loại phản ánh"
+    )
+    description = models.TextField(
+        blank=True,
+        default='',
+        verbose_name="Chi tiết phản ánh"
+    )
+    status = models.CharField(
+        max_length=20,
+        default='PENDING',
+        choices=[
+            ('PENDING', 'Đang xử lý'),
+            ('RESOLVED', 'Đã xác minh và cập nhật'),
+            ('DISMISSED', 'Bác bỏ / Không chính xác'),
+        ],
+        db_index=True,
+        verbose_name="Trạng thái xử lý"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Thời gian báo cáo")
+
+    class Meta:
+        verbose_name = "Báo cáo sai lệch địa điểm"
+        verbose_name_plural = "Danh sách báo cáo địa điểm"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user} báo cáo {self.place.name} ({self.get_report_type_display()})"
+

@@ -6,7 +6,8 @@ from .serializers import (
     RegisterSerializer,
     UserDetailSerializer,
     UserProfileSerializer,
-    LocalVerificationSubmitSerializer
+    LocalVerificationSubmitSerializer,
+    LogoutSerializer
 )
 
 
@@ -37,6 +38,43 @@ class RegisterView(generics.CreateAPIView):
         }, status=status.HTTP_201_CREATED)
 
 
+class MeView(generics.RetrieveAPIView):
+    """
+    API Lấy thông tin tài khoản hiện tại, profile, trạng thái xác thực và quyền hạn.
+    Endpoint: GET /api/v1/auth/me/
+    """
+    serializer_class = UserDetailSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+
+class LogoutView(generics.GenericAPIView):
+    """
+    API Đăng xuất và thu hồi Refresh Token (Blacklist).
+    Endpoint: POST /api/v1/auth/logout/
+    """
+    serializer_class = LogoutSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            token = RefreshToken(serializer.validated_data['refresh'])
+            token.blacklist()
+            return Response({
+                'message': 'Đăng xuất thành công, phiên làm việc đã được đóng an toàn.'
+            }, status=status.HTTP_200_OK)
+        except Exception:
+            return Response({
+                'code': 'INVALID_TOKEN',
+                'message': 'Token không hợp lệ hoặc đã hết hạn.',
+                'field_errors': {'refresh': ['Token không hợp lệ hoặc đã nằm trong blacklist.']}
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
 class UserProfileView(generics.RetrieveUpdateAPIView):
     """
     API Lấy và cập nhật thông tin hồ sơ của chính người dùng đang đăng nhập.
@@ -50,8 +88,8 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
 
 class SubmitLocalVerificationView(generics.GenericAPIView):
     """
-    API Màn hình 3: Gửi thông tin xác thực trở thành Local (SĐT, Khu vực, Số tháng sống).
-    Tự động cấp trạng thái Local nếu cư trú >= 6 tháng.
+    API Màn hình 3: Gửi hồ sơ xác minh cư dân Local (SĐT, Khu vực, Số tháng sống).
+    Hệ thống ghi nhận trạng thái 'pending' để xác minh độc lập, không tự cấp badge.
     """
     serializer_class = LocalVerificationSubmitSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -62,8 +100,11 @@ class SubmitLocalVerificationView(generics.GenericAPIView):
         profile = serializer.update_profile(request.user)
 
         return Response({
+            'verification_status': profile.verification_status,
+            'verification_status_display': profile.get_verification_status_display(),
             'is_local_verified': profile.is_local_verified,
             'residing_district': profile.residing_district,
             'residing_months': profile.residing_months,
-            'message': 'Chúc mừng bạn đã đạt chứng nhận Local Verified!' if profile.is_local_verified else 'Hồ sơ đã được cập nhật. Cần thời gian cư trú tối thiểu 6 tháng để nhận huy hiệu Local.'
+            'message': 'Hồ sơ xác minh cư dân đã được tiếp nhận và chuyển sang trạng thái chờ duyệt. HubLocal tuyệt đối không cấp huy hiệu tự động để bảo đảm uy tín của cộng đồng.'
         }, status=status.HTTP_200_OK)
+

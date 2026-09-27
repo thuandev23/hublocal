@@ -8,5 +8,6 @@ router = DefaultRouter()
 router.register(r'places', PlaceViewSet, basename='place')
 
 urlpatterns = [
+    path('districts/', PlaceViewSet.as_view({'get': 'districts'}), name='districts-list'),
     path('', include(router.urls)),
 ]

@@ -1,5 +1,26 @@
+import math
 from rest_framework import serializers
-from .models import Place, PlaceVerification, Tip
+from .models import Place, PlaceVerification, Tip, SavedPlace, PlaceReport, ReportTypeChoices
+
+
+def calculate_haversine_distance(lat1, lon1, lat2, lon2):
+    """
+    Tính khoảng cách đường chim bay giữa hai tọa độ địa lý (Haversine formula).
+    Đơn vị trả về: Kilometers (km), làm tròn 2 chữ số thập phân.
+    """
+    if None in (lat1, lon1, lat2, lon2):
+        return None
+    try:
+        lat1, lon1, lat2, lon2 = float(lat1), float(lon1), float(lat2), float(lon2)
+    except (ValueError, TypeError):
+        return None
+
+    R = 6371.0  # Bán kính Trái Đất (km)
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return round(R * c, 2)
 
 
 def mask_phone_or_name(user):
@@ -56,9 +77,12 @@ class TipCreateUpdateSerializer(serializers.ModelSerializer):
         fields = ['content']
 
     def validate_content(self, value):
-        if len(value.strip()) < 5:
+        cleaned = value.strip()
+        if len(cleaned) < 5:
             raise serializers.ValidationError("Nội dung mẹo cần tối thiểu 5 ký tự hữu ích.")
-        return value.strip()
+        if len(cleaned) > 1000:
+            raise serializers.ValidationError("Nội dung mẹo tối đa không vượt quá 1000 ký tự.")
+        return cleaned
 
 
 class PlaceListSerializer(serializers.ModelSerializer):
@@ -67,8 +91,11 @@ class PlaceListSerializer(serializers.ModelSerializer):
     Tối ưu hóa tối đa payload mạng và tốc độ render giao diện Flutter.
     """
     category_display = serializers.CharField(source='get_category_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
     trust_tier_display = serializers.CharField(source='get_trust_tier_display', read_only=True)
     short_tip = serializers.SerializerMethodField()
+    is_saved = serializers.SerializerMethodField()
+    distance_km = serializers.SerializerMethodField()
 
     class Meta:
         model = Place
@@ -77,11 +104,19 @@ class PlaceListSerializer(serializers.ModelSerializer):
             'name',
             'category',
             'category_display',
+            'status',
+            'status_display',
             'district',
+            'district_code',
             'address',
             'latitude',
             'longitude',
             'cover_image',
+            'thumbnail_image',
+            'min_price',
+            'max_price',
+            'price_currency',
+            'opening_hours_text',
             'google_maps_url',
             'google_rating',
             'google_review_count',
@@ -90,6 +125,8 @@ class PlaceListSerializer(serializers.ModelSerializer):
             'verified_count',
             'last_verified_at',
             'short_tip',
+            'is_saved',
+            'distance_km',
         ]
 
     def get_short_tip(self, obj):
@@ -100,16 +137,39 @@ class PlaceListSerializer(serializers.ModelSerializer):
             first_tip = obj.tips.first()
         return first_tip.content if first_tip else ""
 
+    def get_is_saved(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        saved_place_ids = self.context.get('saved_place_ids')
+        if saved_place_ids is not None:
+            return obj.id in saved_place_ids
+        return obj.saved_by.filter(user=request.user).exists()
+
+    def get_distance_km(self, obj):
+        request = self.context.get('request')
+        if not request:
+            return None
+        user_lat = request.query_params.get('lat')
+        user_lng = request.query_params.get('lng')
+        if user_lat and user_lng and obj.latitude and obj.longitude:
+            return calculate_haversine_distance(user_lat, user_lng, obj.latitude, obj.longitude)
+        return None
+
 
 class PlaceDetailSerializer(serializers.ModelSerializer):
     """
     Serializer chi tiết cho Màn hình 2 (Chi tiết địa điểm).
-    Bao gồm danh sách mẹo từ cư dân, tọa độ bản đồ, thông tin và review từ Google Maps, trạng thái xác thực.
+    Bao gồm danh sách mẹo từ cư dân, khoảng giá, giờ mở cửa, trạng thái hoạt động,
+    tọa độ bản đồ, thông tin và review từ Google Maps, trạng thái xác thực.
     """
     category_display = serializers.CharField(source='get_category_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
     trust_tier_display = serializers.CharField(source='get_trust_tier_display', read_only=True)
     tips = TipSerializer(many=True, read_only=True)
     user_has_verified = serializers.SerializerMethodField()
+    is_saved = serializers.SerializerMethodField()
+    distance_km = serializers.SerializerMethodField()
     my_tip = serializers.SerializerMethodField()
 
     class Meta:
@@ -119,11 +179,22 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
             'name',
             'category',
             'category_display',
+            'status',
+            'status_display',
             'district',
+            'district_code',
             'address',
             'latitude',
             'longitude',
             'cover_image',
+            'thumbnail_image',
+            'min_price',
+            'max_price',
+            'price_currency',
+            'price_updated_at',
+            'opening_hours_text',
+            'opening_hours_structured',
+            'data_source',
             'google_maps_url',
             'google_rating',
             'google_review_count',
@@ -136,6 +207,8 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
             'last_verified_at',
             'tips',
             'user_has_verified',
+            'is_saved',
+            'distance_km',
             'my_tip',
             'created_at',
             'updated_at',
@@ -147,6 +220,22 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
             return obj.verifications.filter(user=request.user).exists()
         return False
 
+    def get_is_saved(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.saved_by.filter(user=request.user).exists()
+        return False
+
+    def get_distance_km(self, obj):
+        request = self.context.get('request')
+        if not request:
+            return None
+        user_lat = request.query_params.get('lat')
+        user_lng = request.query_params.get('lng')
+        if user_lat and user_lng and obj.latitude and obj.longitude:
+            return calculate_haversine_distance(user_lat, user_lng, obj.latitude, obj.longitude)
+        return None
+
     def get_my_tip(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
@@ -154,3 +243,16 @@ class PlaceDetailSerializer(serializers.ModelSerializer):
             if tip:
                 return TipSerializer(tip, context=self.context).data
         return None
+
+
+class PlaceReportCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlaceReport
+        fields = ['report_type', 'description']
+
+    def validate_description(self, value):
+        cleaned = value.strip()
+        if len(cleaned) > 1000:
+            raise serializers.ValidationError("Nội dung phản ánh tối đa không vượt quá 1000 ký tự.")
+        return cleaned
+
